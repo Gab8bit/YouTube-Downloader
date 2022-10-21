@@ -5,3 +5,5 @@ Forget about ad-filled sites or download limits due to paid licenses.
 With this downloader you can download all YouTube videos and audio in seconds and WITHOUT THOSE STUPID LIMITS.
 
 Download the executable file from the "Releases" section.
+
+Start app by opening "YouTube Downloader.exe" file.
