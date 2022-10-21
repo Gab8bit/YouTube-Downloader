@@ -1,4 +1,4 @@
-# YouTube Downloader
+## YouTube Downloader
 ----------------------------
 A more user-friendly version of the "yt-dlp" downloader.
 Forget about ad-filled sites or download limits due to paid licenses.
