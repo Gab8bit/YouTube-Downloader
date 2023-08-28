@@ -7,3 +7,8 @@ With this downloader you can download all YouTube videos and audio in seconds an
 Download the executable file from the "Releases" section.
 
 Start app by opening "YouTube Downloader.exe" file.
+
+##For Java Release (NEW)
+The Java-based version has an improved and completely redesigned GUI that makes it easier to use.
+
+In the 'Releases' section, you will find the download of a .bat file that will do the setup automatically.
