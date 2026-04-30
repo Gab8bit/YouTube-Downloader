@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; script-src 'self' 'unsafe-inline'">
+  <title>YT Downloader</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f11;
+      --bg2: #161618;
+      --bg3: #1e1e21;
+      --border: rgba(255,255,255,0.08);
+      --border-focus: rgba(255,255,255,0.2);
+      --text: #f0f0f0;
+      --text-muted: #888;
+      --text-dim: #555;
+      --accent: #e63946;
+      --accent-dim: rgba(230,57,70,0.15);
+      --success: #2ecc71;
+      --warn: #f39c12;
+      --radius: 10px;
+      --radius-sm: 6px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Geist', sans-serif;
+      font-size: 14px;
+      user-select: none;
+      overflow: hidden;
+    }
+
+    /* ── TITLEBAR drag area (macOS) ── */
+    .titlebar {
+      -webkit-app-region: drag;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      padding: 0 0px 0 16px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+    .titlebar span {
+      font-size: 13px;
+      color: var(--text-dim);
+      font-weight: 500;
+      letter-spacing: 0.03em;
+    }
+    .titlebar-logo {
+      width: 18px;
+      height: 18px;
+      background: var(--accent);
+      border-radius: 4px;
+      margin-right: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 600;
+      color: white;
+      -webkit-app-region: no-drag;
+    }
+
+    .win-controls {
+      margin-left: auto;
+      display: flex;
+      -webkit-app-region: no-drag;
+    }
+    .win-controls button {
+      width: 46px;
+      height: 36px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .win-controls button:hover { background: rgba(255,255,255,0.08); }
+    .win-controls button.close:hover { background: #c42b1c; color: white; }
+
+    /* ── LAYOUT ── */
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 36px);
+      overflow: hidden;
+    }
+
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 24px 28px;
+      gap: 16px;
+      overflow-y: auto;
+    }
+
+    /* ── URL INPUT SECTION ── */
+    .url-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .url-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .url-input {
+      flex: 1;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: 'Geist Mono', monospace;
+      font-size: 13px;
+      padding: 10px 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .url-input::placeholder { color: var(--text-dim); }
+    .url-input:focus { border-color: var(--border-focus); }
+
+    .btn {
+      padding: 10px 18px;
+      border-radius: var(--radius);
+      border: none;
+      font-family: 'Geist', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.12s;
+      white-space: nowrap;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-ghost {
+      background: var(--bg3);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { color: var(--text); border-color: var(--border-focus); }
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+    .btn-primary:hover { background: #c1121f; }
+    .btn-primary:disabled {
+      background: var(--bg3);
+      color: var(--text-dim);
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* ── VIDEO INFO CARD ── */
+    .info-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      display: none;
+    }
+    .info-card.visible { display: flex; }
+
+    .thumbnail {
+      width: 120px;
+      height: 68px;
+      object-fit: cover;
+      border-radius: var(--radius-sm);
+      background: var(--bg3);
+      flex-shrink: 0;
+    }
+    .thumbnail-placeholder {
+      width: 120px;
+      height: 68px;
+      background: var(--bg3);
+      border-radius: var(--radius-sm);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .info-meta {
+      flex: 1;
+      min-width: 0;
+    }
+    .info-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text);
+      line-height: 1.4;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+    .info-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 500;
+      background: var(--accent-dim);
+      color: var(--accent);
+      margin-top: 6px;
+    }
+
+    .playlist-banner {
+      background: var(--accent-dim);
+      border: 1px solid rgba(230,57,70,0.3);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--text);
+    }
+    .playlist-toggle { display: flex; gap: 6px; }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+    .btn-ghost.active { border-color: var(--accent); color: var(--accent); }
+
+    /* ── OPTIONS ── */
+    .options-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .option-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .option-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .select {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: 'Geist', sans-serif;
+      font-size: 13px;
+      padding: 8px 12px;
+      outline: none;
+      cursor: pointer;
+      width: 100%;
+    }
+    .select:focus { border-color: var(--border-focus); }
+
+    .folder-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .folder-path {
+      flex: 1;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+      font-family: 'Geist Mono', monospace;
+      font-size: 12px;
+      padding: 8px 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── TOGGLE SWITCH ── */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+    }
+    .toggle-label {
+      font-size: 13px;
+      color: var(--text);
+    }
+    .toggle {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: var(--bg3);
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle input:checked + .toggle-track { background: var(--accent); border-color: transparent; }
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      background: var(--text-muted);
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .toggle input:checked + .toggle-track::after {
+      transform: translateX(16px);
+      background: white;
+    }
+
+    /* ── PROGRESS ── */
+    .progress-section {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .progress-section.visible { display: flex; }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+    .progress-status { color: var(--text-muted); }
+    .progress-pct { color: var(--text); font-weight: 500; font-family: 'Geist Mono', monospace; }
+
+    .progress-bar-wrap {
+      height: 4px;
+      background: var(--bg3);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 99px;
+      width: 0%;
+      transition: width 0.3s;
+    }
+    .progress-bar-fill.done { background: var(--success); }
+
+    .progress-meta {
+      font-size: 11px;
+      color: var(--text-dim);
+      font-family: 'Geist Mono', monospace;
+    }
+
+    /* ── LOG ── */
+    .log-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 80px;
+    }
+    .log-box {
+      flex: 1;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-family: 'Geist Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      overflow-y: auto;
+      max-height: 120px;
+      line-height: 1.6;
+    }
+    .log-line { margin-bottom: 1px; }
+    .log-line.error { color: #e05050; }
+    .log-line.success { color: var(--success); }
+
+    /* ── FOOTER ── */
+    .footer {
+      padding: 10px 28px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .footer-text {
+      flex: 1;
+      color: var(--text-muted);
+      font-family: 'Geist Mono', monospace;
+      font-size: 12px;
+      padding: 8px 0px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── STATES ── */
+    .state-fetching .btn-fetch { opacity: 0.5; pointer-events: none; }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-focus); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+  <div class="titlebar">
+    <div class="titlebar-logo">▶</div>
+    <span>YT Downloader - by Gab8bit</span>
+    <div class="win-controls">
+      <button onclick="window.ytdlp.windowControl('minimize')">─</button>
+      <button class="close" onclick="window.ytdlp.windowControl('close')">✕</button>
+    </div>
+  </div>
+
+  <div class="app">
+    <div class="main-content">
+
+      <!-- URL INPUT -->
+      <div class="url-section">
+        <div class="url-row">
+          <input class="url-input" id="urlInput" type="text" placeholder="Incolla l'URL del video..." />
+          <button class="btn btn-ghost btn-fetch" id="btnFetch">Cerca</button>
+        </div>
+      </div>
+
+      <!-- VIDEO INFO -->
+      <div class="info-card" id="infoCard">
+        <div class="thumbnail-placeholder" id="thumbnailPlaceholder">🎬</div>
+        <img class="thumbnail" id="thumbnail" style="display:none" />
+        <div class="info-meta">
+          <div class="info-title" id="videoTitle">—</div>
+          <div class="info-sub" id="videoSub">—</div>
+          <div class="badge" id="videoDuration">0:00</div>
+        </div>
+        <div>
+          <button class="btn btn-primary" id="btnDownload" disabled>Scarica</button>
+        </div>
+      </div>
+
+      <div class="playlist-banner" id="playlistBanner" style="display:none">
+        <span id="playlistLabel">Playlist rilevata</span>
+        <div class="playlist-toggle">
+          <button class="btn btn-ghost btn-sm active" id="btnSingleVideo">Solo questo video</button>
+          <button class="btn btn-ghost btn-sm" id="btnFullPlaylist">Tutta la playlist</button>
+        </div>
+      </div>
+
+      <!-- OPZIONI -->
+      <div class="options-row">
+        <div class="option-group">
+          <div class="option-label">Qualità</div>
+          <select class="select" id="formatSelect">
+            <option value="bestvideo+bestaudio">Migliore qualità (auto)</option>
+            <option value="bestvideo[height<=1080]+bestaudio">1080p</option>
+            <option value="bestvideo[height<=720]+bestaudio">720p</option>
+            <option value="bestvideo[height<=480]+bestaudio">480p</option>
+          </select>
+        </div>
+        <div class="option-group">
+          <div class="option-label">Solo audio (MP3)</div>
+          <div class="toggle-row">
+            <span class="toggle-label">Estrai audio</span>
+            <label class="toggle">
+              <input type="checkbox" id="audioToggle" />
+              <div class="toggle-track"></div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- CARTELLA OUTPUT -->
+      <div class="option-group">
+        <div class="option-label">Cartella di destinazione</div>
+        <div class="folder-row">
+          <div class="folder-path" id="folderPath">Scegli una cartella</div>
+          <button class="btn btn-ghost" id="btnChooseFolder">Scegli</button>
+          <button class="btn btn-ghost" id="btnOpenFolder">Apri</button>
+        </div>
+      </div>
+
+      <!-- PROGRESS -->
+      <div class="progress-section" id="progressSection">
+        <div class="progress-header">
+          <span class="progress-status" id="progressStatus">Download in corso...</span>
+          <span class="progress-pct" id="progressPct">0%</span>
+        </div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-meta" id="progressMeta"></div>
+      </div>
+
+      <!-- LOG -->
+      <div class="log-section">
+        <div class="option-label">Log</div>
+        <div class="log-box" id="logBox">
+          <div class="log-line"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+      <p class="footer-text">Versione app: <span id="versionApp">v0.0.0</span><br>Versione yt-dlp: <span id="versionYtdlp">0-0-0</span></p>
+      <button class="btn btn-ghost" id="btnClear">Pulisci</button>
+    </div>
+  </div>
+
+  <script>
+    const urlInput = document.getElementById('urlInput')
+    const btnFetch = document.getElementById('btnFetch')
+    const btnDownload = document.getElementById('btnDownload')
+    const btnClear = document.getElementById('btnClear')
+    const btnChooseFolder = document.getElementById('btnChooseFolder')
+    const btnOpenFolder = document.getElementById('btnOpenFolder')
+    const infoCard = document.getElementById('infoCard')
+    const playlistBanner = document.getElementById('playlistBanner')
+    const thumbnail = document.getElementById('thumbnail')
+    const thumbnailPlaceholder = document.getElementById('thumbnailPlaceholder')
+    const videoTitle = document.getElementById('videoTitle')
+    const videoSub = document.getElementById('videoSub')
+    const videoDuration = document.getElementById('videoDuration')
+    const formatSelect = document.getElementById('formatSelect')
+    const audioToggle = document.getElementById('audioToggle')
+    const folderPath = document.getElementById('folderPath')
+    const progressSection = document.getElementById('progressSection')
+    const progressFill = document.getElementById('progressFill')
+    const progressPct = document.getElementById('progressPct')
+    const progressStatus = document.getElementById('progressStatus')
+    const progressMeta = document.getElementById('progressMeta')
+    const logBox = document.getElementById('logBox')
+
+    let outputDir = null
+    let isDownloading = false
+
+    // Prendi la cartella Downloads dal main
+    window.ytdlp.getDownloadsDir().then(dir => {
+      folderPath.textContent = dir
+    })
+
+    window.ytdlp.getVersions().then(({ app, ytdlp }) => {
+      document.getElementById('versionApp').textContent = `v${app}`
+      document.getElementById('versionYtdlp').textContent = `yt-dlp ${ytdlp}`
+    })
+
+    urlInput.addEventListener('input', () => {
+      btnDownload.disabled = !urlInput.value.trim()
+    })
+
+    // Cerca info video
+    btnFetch.addEventListener('click', async () => {
+      const url = urlInput.value.trim()
+      if (!url) return
+      btnFetch.textContent = 'Caricamento...'
+      btnFetch.disabled = true
+      addLog('Recupero info video...')
+      try {
+        const info = await window.ytdlp.fetchInfo(url)
+        videoTitle.textContent = info.title || 'Titolo non disponibile'
+        videoSub.textContent = info.uploader || ''
+        videoDuration.textContent = info.duration || ''
+        if (info.thumbnail) {
+          thumbnail.src = info.thumbnail
+          thumbnail.style.display = 'block'
+          thumbnailPlaceholder.style.display = 'none'
+        }
+        infoCard.classList.add('visible')
+        const banner = document.getElementById('playlistBanner')
+        if (info.isPlaylist) {
+          document.getElementById('playlistLabel').textContent = 
+            `Playlist rilevata — ${info.playlistCount ? info.playlistCount + ' video' : ''}`
+          banner.style.display = 'flex'
+          downloadPlaylist = false // reset default
+          document.getElementById('btnSingleVideo').classList.add('active')
+          document.getElementById('btnFullPlaylist').classList.remove('active')
+        } else {
+          banner.style.display = 'none'
+        }
+        btnDownload.disabled = false
+        addLog(`Trovato: ${info.title}`, 'success')
+      } catch (err) {
+        addLog('Errore: ' + err.message, 'error')
+      }
+      btnFetch.textContent = 'Cerca info'
+      btnFetch.disabled = false
+    })
+
+    // Scegli cartella
+    btnChooseFolder.addEventListener('click', async () => {
+      const dir = await window.ytdlp.chooseFolder()
+      if (dir) {
+        outputDir = dir
+        folderPath.textContent = dir
+      }
+    })
+
+    // Apri cartella
+    btnOpenFolder.addEventListener('click', async () => {
+      const dir = outputDir || await window.ytdlp.getDownloadsDir()
+      window.ytdlp.openFolder(dir)
+    })
+
+    // Download
+    btnDownload.addEventListener('click', async () => {
+      if (isDownloading) return
+      const url = urlInput.value.trim()
+      if (!url) return
+
+      isDownloading = true
+      btnDownload.disabled = true
+      progressSection.classList.add('visible')
+      setProgress(0)
+      progressStatus.textContent = 'Download in corso...'
+      addLog('Avvio download...')
+
+      window.ytdlp.removeAllListeners()
+
+      window.ytdlp.onProgress(({ percent, size, speed }) => {
+        setProgress(percent)
+        if (size && speed) {
+          progressMeta.textContent = `${size} — ${speed}`
+        }
+      })
+
+      window.ytdlp.onConverting(() => {
+        progressStatus.textContent = 'Conversione in corso...'
+      })
+
+      window.ytdlp.onLog(line => {
+        if (line.trim()) addLog(line.trim())
+      })
+
+      try {
+        const defaultDir = await window.ytdlp.getDownloadsDir()
+        const dir = outputDir || defaultDir
+        await window.ytdlp.startDownload({
+          url,
+          outputDir: dir,
+          format: formatSelect.value,
+          audioOnly: audioToggle.checked,
+          playlist: downloadPlaylist
+        })
+        setProgress(100, true)
+        progressStatus.textContent = 'Download completato!'
+        addLog('✓ Download completato!', 'success')
+      } catch (err) {
+        progressStatus.textContent = 'Errore durante il download'
+        addLog('Errore: ' + err.message, 'error')
+      }
+
+      isDownloading = false
+      btnDownload.disabled = false
+    })
+
+    // Pulisci
+    btnClear.addEventListener('click', () => {
+      urlInput.value = ''
+      infoCard.classList.remove('visible')
+      progressSection.classList.remove('visible')
+      logBox.innerHTML = '<div class="log-line"></div>'
+      btnDownload.disabled = true
+      thumbnail.style.display = 'none'
+      playlistBanner.style.display = 'none'
+      thumbnailPlaceholder.style.display = 'flex'
+      window.ytdlp.removeAllListeners()
+      isDownloading = false
+    })
+
+    // Audio toggle → disabilita formato
+    audioToggle.addEventListener('change', () => {
+      formatSelect.disabled = audioToggle.checked
+      formatSelect.style.opacity = audioToggle.checked ? '0.4' : '1'
+    })
+
+    // ── UTILS ──
+
+    function setProgress(pct, done = false) {
+      progressFill.style.width = pct + '%'
+      progressPct.textContent = Math.round(pct) + '%'
+      if (done) progressFill.classList.add('done')
+      else progressFill.classList.remove('done')
+    }
+
+    function addLog(msg, type = '') {
+      const el = document.createElement('div')
+      el.className = 'log-line' + (type ? ' ' + type : '')
+      el.textContent = msg
+      // rimuovi il messaggio placeholder se c'è
+      const placeholder = logBox.querySelector('.log-line:only-child')
+      if (placeholder?.textContent === 'In attesa...') logBox.innerHTML = ''
+      logBox.appendChild(el)
+      logBox.scrollTop = logBox.scrollHeight
+    }
+
+    let downloadPlaylist = false
+
+    document.getElementById('btnSingleVideo').addEventListener('click', () => {
+      downloadPlaylist = false
+      document.getElementById('btnSingleVideo').classList.add('active')
+      document.getElementById('btnFullPlaylist').classList.remove('active')
+    })
+    document.getElementById('btnFullPlaylist').addEventListener('click', () => {
+      downloadPlaylist = true
+      document.getElementById('btnFullPlaylist').classList.add('active')
+      document.getElementById('btnSingleVideo').classList.remove('active')
+    })
+
+    window.ytdlp.onItem(({ current, total }) => {
+      progressStatus.textContent = `Download in corso... (video ${current} di ${total})`
+      progressFill.style.background = 'var(--accent)'
+    })
+  </script>
+</body>
+</html>
