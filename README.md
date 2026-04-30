@@ -2,13 +2,13 @@
 
 ## Struttura
 ```
-ytdlp-electron/
+YTDownloader/
 ├── src/
 │   ├── main.js        ← processo principale Electron
 │   ├── preload.js     ← bridge sicuro IPC
 │   └── renderer.html  ← UI
-├── bin/               ← metti qui yt-dlp (per la build)
-├── assets/            ← icon.png ecc.
+├── bin/               ← Eseguibili yt-dlp e ffmpeg
+├── assets/            ← Icone e altro
 └── package.json
 ```
 
