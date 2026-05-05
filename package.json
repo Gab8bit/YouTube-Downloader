@@ -1,7 +1,7 @@
 {
   "name": "ytdlp-electron",
   "author": "Gab8bit",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "yt-dlp GUI con Electron",
   "main": "src/main.js",
   "scripts": {

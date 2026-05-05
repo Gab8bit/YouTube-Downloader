@@ -124,7 +124,11 @@ ipcMain.handle('start-download', async (_, { url, outputDir, format, audioOnly, 
     if (audioOnly) {
       args.push('-x', '--audio-format', 'mp3')
     } else {
-      if (format) args.push('-f', format)
+      if (format) {
+        args.push('-f', format)
+      } else {
+        args.push('-f', 'bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]/bestvideo[vcodec^=avc1]+bestaudio/best[vcodec^=avc1]')
+      }
       args.push('--merge-output-format', 'mp4')
       args.push('--postprocessor-args', 'ffmpeg:-c:a aac')
     }
