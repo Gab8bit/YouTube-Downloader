@@ -1,0 +1,147 @@
+import { Button, LineEdit, SpinBox, ListView, ScrollView, Palette } from "std-widgets.slint";
+import { Theme, Icons } from "theme.slint";
+import { Card, FluentIcon, SectionHeader, SettingRow } from "components.slint";
+import { AppState } from "state.slint";
+
+export component LogPage inherits Rectangle {
+    VerticalLayout {
+        padding: 28px;
+        padding-top: 20px;
+        spacing: 14px;
+
+        HorizontalLayout {
+            Text {
+                text: @tr("Log");
+                font-size: 28px;
+                font-weight: 600;
+                color: Theme.text-primary;
+                horizontal-stretch: 1;
+            }
+            Button {
+                text: @tr("Pulisci");
+                clicked => { AppState.clear-log(); }
+            }
+        }
+
+        Card {
+            vertical-stretch: 1;
+            log-view := ListView {
+                // Scorre automaticamente in fondo quando arrivano nuove righe.
+                changed content-height => {
+                    self.content-y = Math.min(0px, self.visible-height - self.content-height);
+                }
+                for line in AppState.log: Text {
+                    x: 12px;
+                    width: parent.width - 24px;
+                    text: line.text;
+                    font-family: "Cascadia Mono";
+                    font-size: 12px;
+                    wrap: word-wrap;
+                    color: line.kind == 1 ? Theme.critical : line.kind == 2 ? Theme.success : Theme.text-secondary;
+                }
+            }
+        }
+    }
+}
+
+export component SettingsPage inherits Rectangle {
+    ScrollView {
+        VerticalLayout {
+            padding: 28px;
+            padding-top: 20px;
+            spacing: 6px;
+            alignment: start;
+
+            Text {
+                text: @tr("Impostazioni");
+                font-size: 28px;
+                font-weight: 600;
+                color: Theme.text-primary;
+            }
+            Rectangle { height: 8px; }
+
+            SectionHeader { text: @tr("Download"); }
+            SettingRow {
+                glyph: Icons.folder;
+                title: @tr("Cartella di destinazione");
+                description: AppState.output-dir;
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: 8px;
+                    Button {
+                        text: @tr("Cambia…");
+                        clicked => { AppState.choose-folder(); }
+                    }
+                    Button {
+                        text: @tr("Apri");
+                        clicked => { AppState.open-folder(); }
+                    }
+                }
+            }
+            SettingRow {
+                glyph: Icons.open-file;
+                title: @tr("Nome dei file");
+                description: @tr("Modello yt-dlp, es. %(title)s.%(ext)s oppure %(uploader)s - %(title)s.%(ext)s");
+                VerticalLayout {
+                    alignment: center;
+                    LineEdit {
+                        width: 260px;
+                        text <=> AppState.filename-template;
+                        edited => { AppState.settings-changed(); }
+                    }
+                }
+            }
+            SettingRow {
+                glyph: Icons.download;
+                title: @tr("Download simultanei");
+                description: @tr("Quanti elementi della coda scaricare in parallelo");
+                VerticalLayout {
+                    alignment: center;
+                    SpinBox {
+                        width: 120px;
+                        minimum: 1;
+                        maximum: 6;
+                        value <=> AppState.max-parallel;
+                        edited => { AppState.settings-changed(); }
+                    }
+                }
+            }
+
+            Rectangle { height: 14px; }
+            SectionHeader { text: @tr("Componenti"); }
+            SettingRow {
+                glyph: Icons.download;
+                title: "yt-dlp";
+                description: AppState.ytdlp-version;
+                VerticalLayout {
+                    alignment: center;
+                    Button {
+                        text: AppState.tools-busy ? @tr("Aggiornamento…") : @tr("Aggiorna");
+                        enabled: !AppState.tools-busy;
+                        clicked => { AppState.update-ytdlp(); }
+                    }
+                }
+            }
+            SettingRow {
+                glyph: Icons.video;
+                title: "FFmpeg";
+                description: AppState.ffmpeg-version;
+            }
+
+            Rectangle { height: 14px; }
+            SectionHeader { text: @tr("Informazioni"); }
+            SettingRow {
+                glyph: Icons.info;
+                title: "YT Downloader " + AppState.app-version;
+                description: @tr("GUI nativa per yt-dlp · by Gab8bit");
+                VerticalLayout {
+                    alignment: center;
+                    Button {
+                        text: "GitHub";
+                        clicked => { AppState.open-url("https://github.com/Gab8bit/YouTube-Downloader"); }
+                    }
+                }
+            }
+        }
+    }
+}

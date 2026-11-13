@@ -1,0 +1,90 @@
+export enum JobState { queued, starting, downloading, processing, paused, done, failed, cancelled }
+
+export struct QueueItem {
+    id: int,
+    title: string,
+    detail: string,
+    state: JobState,
+    progress: float,
+    speed: string,
+    eta: string,
+    size: string,
+    item-index: int,
+    item-count: int,
+    error: string,
+    thumb: image,
+    has-thumb: bool,
+    is-audio: bool,
+    has-file: bool,
+}
+
+export struct LogLine {
+    text: string,
+    // 0 = normale, 1 = errore, 2 = successo
+    kind: int,
+}
+
+// Stato condiviso tra UI e logica Rust.
+export global AppState {
+    // ── Ricerca ──
+    in-out property <string> url;
+    in property <bool> fetching;
+    in-out property <string> error-message;
+
+    in property <bool> has-info;
+    in property <string> info-title;
+    in property <string> info-uploader;
+    in property <string> info-duration;
+    in property <image> info-thumb;
+    in property <bool> info-has-thumb;
+    in property <bool> info-is-playlist;
+    in property <bool> info-has-video;
+    in property <int> info-count;
+    in-out property <bool> playlist-all;
+
+    // ── Opzioni di download ──
+    in-out property <int> kind; // 0 = video, 1 = solo audio
+    in-out property <int> quality;
+    in-out property <bool> compat: true;
+    in-out property <int> audio-format;
+    in-out property <int> audio-quality;
+    in-out property <string> output-dir;
+
+    // ── Impostazioni ──
+    in-out property <string> filename-template;
+    in-out property <int> max-parallel: 2;
+
+    // ── Coda e log ──
+    in property <[QueueItem]> queue;
+    in property <int> active-count;
+    in property <int> finished-count;
+    in property <[LogLine]> log;
+
+    // ── Componenti ──
+    in property <string> app-version;
+    in property <string> ytdlp-version;
+    in property <string> ffmpeg-version;
+    in property <bool> tools-busy;
+    in property <bool> tools-ready;
+
+    callback fetch(string);
+    callback paste();
+    callback dismiss-info();
+    callback download();
+    callback choose-folder();
+    callback open-folder();
+    callback settings-changed();
+
+    callback pause(int);
+    callback resume(int);
+    callback cancel(int);
+    callback retry(int);
+    callback remove(int);
+    callback open-file(int);
+    callback show-file(int);
+    callback clear-finished();
+
+    callback clear-log();
+    callback update-ytdlp();
+    callback open-url(string);
+}

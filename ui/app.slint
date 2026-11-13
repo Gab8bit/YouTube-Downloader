@@ -1,0 +1,85 @@
+import { Palette } from "std-widgets.slint";
+import { Theme, Icons } from "theme.slint";
+import { NavItem } from "components.slint";
+import { AppState, JobState, QueueItem, LogLine } from "state.slint";
+import { DownloadPage } from "download-page.slint";
+import { LogPage, SettingsPage } from "other-pages.slint";
+
+export { AppState, JobState, QueueItem, LogLine, Theme }
+
+export component AppWindow inherits Window {
+    in-out property <int> page: 0;
+
+    title: "YT Downloader";
+    icon: @image-url("../assets/icon.png");
+    preferred-width: 1000px;
+    preferred-height: 720px;
+    min-width: 780px;
+    min-height: 560px;
+    background: Theme.page-bg;
+    default-font-family: "Segoe UI Variable Text";
+    default-font-size: 14px;
+
+    HorizontalLayout {
+        // ── Navigazione laterale ──
+        Rectangle {
+            width: 220px;
+            background: Theme.nav-bg;
+            VerticalLayout {
+                padding: 8px;
+                padding-top: 12px;
+                spacing: 4px;
+
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-bottom: 10px;
+                    spacing: 10px;
+                    Image {
+                        source: @image-url("../assets/icon.png");
+                        width: 20px;
+                        height: 20px;
+                    }
+                    Text {
+                        text: "YT Downloader";
+                        font-size: 13px;
+                        color: Theme.text-primary;
+                        vertical-alignment: center;
+                    }
+                }
+
+                NavItem {
+                    glyph: Icons.download;
+                    label: AppState.active-count > 0 ? @tr("Download ({})", AppState.active-count) : @tr("Download");
+                    selected: root.page == 0;
+                    clicked => { root.page = 0; }
+                }
+                NavItem {
+                    glyph: Icons.log;
+                    label: @tr("Log");
+                    selected: root.page == 1;
+                    clicked => { root.page = 1; }
+                }
+                Rectangle { vertical-stretch: 1; }
+                NavItem {
+                    glyph: Icons.settings;
+                    label: @tr("Impostazioni");
+                    selected: root.page == 2;
+                    clicked => { root.page = 2; }
+                }
+            }
+        }
+
+        // ── Contenuto ──
+        Rectangle {
+            horizontal-stretch: 1;
+            background: Theme.dark ? #272727 : #f9f9f9;
+            border-top-left-radius: 8px;
+            border-width: 1px;
+            border-color: Theme.card-stroke;
+
+            if root.page == 0: DownloadPage { }
+            if root.page == 1: LogPage { }
+            if root.page == 2: SettingsPage { }
+        }
+    }
+}

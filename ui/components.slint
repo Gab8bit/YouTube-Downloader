@@ -1,0 +1,173 @@
+import { Palette } from "std-widgets.slint";
+import { Theme, Icons } from "theme.slint";
+
+export component FluentIcon inherits Text {
+    font-family: Theme.icon-font;
+    font-size: 16px;
+    color: Theme.text-primary;
+    vertical-alignment: center;
+    horizontal-alignment: center;
+}
+
+// Superficie "card" in stile Windows 11.
+export component Card inherits Rectangle {
+    background: Theme.card-bg;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: Theme.card-stroke;
+}
+
+// Pulsante trasparente con sola icona (stile "subtle" di Fluent).
+export component IconButton inherits Rectangle {
+    in property <string> glyph;
+    in property <string> label;
+    in property <bool> enabled: true;
+    in property <color> glyph-color: Theme.text-primary;
+    callback clicked;
+
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    background: !root.enabled ? transparent : ta.pressed ? Theme.subtle-pressed : ta.has-hover ? Theme.subtle-hover : transparent;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => { root.clicked(); }
+
+    FluentIcon {
+        text: root.glyph;
+        font-size: 14px;
+        color: root.enabled ? root.glyph-color : Theme.text-tertiary;
+    }
+
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+// Voce del menu di navigazione laterale (NavigationView).
+export component NavItem inherits Rectangle {
+    in property <string> glyph;
+    in property <string> label;
+    in property <bool> selected;
+    callback clicked;
+
+    height: 36px;
+    border-radius: 4px;
+    background: root.selected ? Theme.subtle-selected : ta.pressed ? Theme.subtle-pressed : ta.has-hover ? Theme.subtle-hover : transparent;
+    accessible-role: tab;
+    accessible-label: root.label;
+    accessible-action-default => { root.clicked(); }
+
+    Rectangle {
+        x: 0;
+        width: 3px;
+        height: root.selected ? 16px : 0px;
+        y: (root.height - self.height) / 2;
+        border-radius: 1.5px;
+        background: Palette.accent-background;
+        animate height { duration: 160ms; easing: ease-out; }
+    }
+
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 12px;
+        spacing: 14px;
+        FluentIcon {
+            text: root.glyph;
+            width: 18px;
+        }
+        Text {
+            text: root.label;
+            color: Theme.text-primary;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+    }
+
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+// Barra informativa (InfoBar) per errori e avvisi.
+export component InfoBar inherits Rectangle {
+    in property <string> text;
+    in property <bool> critical: true;
+    callback dismissed;
+
+    background: root.critical ? Theme.critical-bg : Theme.info-bg;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: Theme.card-stroke;
+    min-height: 44px;
+
+    HorizontalLayout {
+        padding: 10px;
+        padding-left: 14px;
+        spacing: 12px;
+        FluentIcon {
+            text: root.critical ? Icons.error : Icons.info;
+            color: root.critical ? Theme.critical : Palette.accent-background;
+            width: 18px;
+        }
+        Text {
+            text: root.text;
+            color: Theme.text-primary;
+            wrap: word-wrap;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        IconButton {
+            glyph: Icons.cancel;
+            label: @tr("Chiudi");
+            clicked => { root.dismissed(); }
+        }
+    }
+}
+
+// Etichetta di sezione.
+export component SectionHeader inherits Text {
+    font-size: 14px;
+    font-weight: 600;
+    color: Theme.text-primary;
+}
+
+// Riga di impostazione (titolo + descrizione a sinistra, controllo a destra).
+export component SettingRow inherits Card {
+    in property <string> glyph;
+    in property <string> title;
+    in property <string> description;
+
+    min-height: 68px;
+    HorizontalLayout {
+        padding: 16px;
+        padding-top: 12px;
+        padding-bottom: 12px;
+        spacing: 16px;
+        FluentIcon {
+            text: root.glyph;
+            width: 20px;
+            font-size: 18px;
+        }
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            spacing: 2px;
+            Text {
+                text: root.title;
+                color: Theme.text-primary;
+                wrap: word-wrap;
+            }
+            if root.description != "": Text {
+                text: root.description;
+                color: Theme.text-secondary;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+        }
+        @children
+    }
+}

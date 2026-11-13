@@ -1,0 +1,425 @@
+import { Button, LineEdit, ComboBox, Switch, ProgressIndicator, ListView, Palette } from "std-widgets.slint";
+import { Theme, Icons } from "theme.slint";
+import { Card, FluentIcon, IconButton, InfoBar, SectionHeader } from "components.slint";
+import { AppState, JobState, QueueItem } from "state.slint";
+
+component QueueRow inherits Rectangle {
+    in property <QueueItem> item;
+
+    property <int> pct: Math.round(root.item.progress * 100);
+    property <string> prefix: root.item.item-count > 1 ? @tr("Video {} di {}", root.item.item-index, root.item.item-count) + " · " : "";
+    property <string> status-text: {
+        if root.item.state == JobState.queued { return @tr("In coda"); }
+        if root.item.state == JobState.starting { return @tr("Avvio…"); }
+        if root.item.state == JobState.downloading {
+            let extra = (root.item.size != "" ? " · " + root.item.size : "") + (root.item.speed != "" ? " · " + root.item.speed : "") + (root.item.eta != "" ? " · " + @tr("{} rimanenti", root.item.eta) : "");
+            return root.prefix + root.pct + "%" + extra;
+        }
+        if root.item.state == JobState.processing { return root.prefix + @tr("Conversione in corso…"); }
+        if root.item.state == JobState.paused { return @tr("In pausa · {}%", root.pct); }
+        if root.item.state == JobState.done { return @tr("Completato"); }
+        if root.item.state == JobState.failed { return @tr("Errore: {}", root.item.error); }
+        return @tr("Annullato");
+    }
+    property <bool> active: root.item.state == JobState.starting || root.item.state == JobState.downloading || root.item.state == JobState.processing;
+
+    height: 76px;
+    border-radius: 6px;
+    background: ta.has-hover ? Theme.subtle-hover : transparent;
+
+    ta := TouchArea {
+        double-clicked => {
+            if root.item.has-file { AppState.open-file(root.item.id); }
+        }
+    }
+
+    HorizontalLayout {
+        padding: 10px;
+        padding-left: 12px;
+        padding-right: 8px;
+        spacing: 14px;
+
+        Rectangle {
+            width: 96px;
+            height: 54px;
+            y: (parent.height - self.height) / 2;
+            border-radius: 4px;
+            clip: true;
+            background: Theme.subtle-selected;
+            if root.item.has-thumb: Image {
+                width: parent.width;
+                height: parent.height;
+                source: root.item.thumb;
+                image-fit: cover;
+            }
+            if !root.item.has-thumb: FluentIcon {
+                text: root.item.is-audio ? Icons.music : Icons.video;
+                color: Theme.text-tertiary;
+                font-size: 20px;
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 4px;
+            horizontal-stretch: 1;
+            Text {
+                text: root.item.title;
+                color: Theme.text-primary;
+                font-weight: 600;
+                overflow: elide;
+            }
+            HorizontalLayout {
+                spacing: 6px;
+                if root.item.state == JobState.done: FluentIcon {
+                    text: Icons.ok;
+                    font-size: 12px;
+                    color: Theme.success;
+                }
+                if root.item.state == JobState.failed: FluentIcon {
+                    text: Icons.error;
+                    font-size: 12px;
+                    color: Theme.critical;
+                }
+                Text {
+                    text: root.item.detail + "  ·  " + root.status-text;
+                    color: root.item.state == JobState.failed ? Theme.critical : Theme.text-secondary;
+                    font-size: 12px;
+                    overflow: elide;
+                    horizontal-stretch: 1;
+                }
+            }
+            if root.active || root.item.state == JobState.paused: ProgressIndicator {
+                height: 4px;
+                progress: root.item.progress;
+                indeterminate: root.item.state == JobState.starting || root.item.state == JobState.processing;
+            }
+        }
+
+        HorizontalLayout {
+            alignment: center;
+            spacing: 2px;
+            if root.active: IconButton {
+                glyph: Icons.pause;
+                label: @tr("Pausa");
+                clicked => { AppState.pause(root.item.id); }
+            }
+            if root.item.state == JobState.paused: IconButton {
+                glyph: Icons.play;
+                label: @tr("Riprendi");
+                clicked => { AppState.resume(root.item.id); }
+            }
+            if root.item.state == JobState.failed || root.item.state == JobState.cancelled: IconButton {
+                glyph: Icons.retry;
+                label: @tr("Riprova");
+                clicked => { AppState.retry(root.item.id); }
+            }
+            if root.item.state == JobState.done && root.item.has-file: IconButton {
+                glyph: Icons.open-file;
+                label: @tr("Apri file");
+                clicked => { AppState.open-file(root.item.id); }
+            }
+            if root.item.state == JobState.done: IconButton {
+                glyph: Icons.folder;
+                label: @tr("Mostra nella cartella");
+                clicked => { AppState.show-file(root.item.id); }
+            }
+            if root.active || root.item.state == JobState.queued || root.item.state == JobState.paused: IconButton {
+                glyph: Icons.cancel;
+                label: @tr("Annulla");
+                clicked => { AppState.cancel(root.item.id); }
+            }
+            if !root.active && root.item.state != JobState.queued && root.item.state != JobState.paused: IconButton {
+                glyph: Icons.delete;
+                label: @tr("Rimuovi dalla lista");
+                clicked => { AppState.remove(root.item.id); }
+            }
+        }
+    }
+}
+
+component OptionLabel inherits Text {
+    font-size: 12px;
+    color: Theme.text-secondary;
+}
+
+export component DownloadPage inherits Rectangle {
+    VerticalLayout {
+        padding: 28px;
+        padding-top: 20px;
+        spacing: 14px;
+
+        Text {
+            text: @tr("Download");
+            font-size: 28px;
+            font-weight: 600;
+            color: Theme.text-primary;
+        }
+
+        // ── URL ──
+        HorizontalLayout {
+            spacing: 8px;
+            url-edit := LineEdit {
+                placeholder-text: @tr("Incolla l'URL di un video o di una playlist…");
+                text <=> AppState.url;
+                horizontal-stretch: 1;
+                accepted(text) => { AppState.fetch(text); }
+            }
+            Button {
+                text: @tr("Incolla");
+                clicked => { AppState.paste(); }
+            }
+            Button {
+                text: AppState.fetching ? @tr("Ricerca…") : @tr("Cerca");
+                primary: true;
+                enabled: !AppState.fetching && AppState.url != "";
+                clicked => { AppState.fetch(AppState.url); }
+            }
+        }
+
+        if AppState.error-message != "": InfoBar {
+            text: AppState.error-message;
+            dismissed => { AppState.error-message = ""; }
+        }
+
+        // ── Info video ──
+        if AppState.fetching && !AppState.has-info: Card {
+            height: 60px;
+            HorizontalLayout {
+                padding: 16px;
+                spacing: 12px;
+                ProgressIndicator {
+                    indeterminate: true;
+                    height: 4px;
+                    y: (parent.height - self.height) / 2;
+                }
+            }
+        }
+
+        if AppState.has-info: Card {
+            VerticalLayout {
+                padding: 12px;
+                spacing: 12px;
+                HorizontalLayout {
+                    spacing: 14px;
+                    Rectangle {
+                        width: 160px;
+                        height: 90px;
+                        border-radius: 6px;
+                        clip: true;
+                        background: Theme.subtle-selected;
+                        if AppState.info-has-thumb: Image {
+                            width: parent.width;
+                            height: parent.height;
+                            source: AppState.info-thumb;
+                            image-fit: cover;
+                        }
+                        if !AppState.info-has-thumb: FluentIcon {
+                            text: AppState.info-is-playlist && !AppState.info-has-video ? Icons.playlist : Icons.video;
+                            color: Theme.text-tertiary;
+                            font-size: 28px;
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 4px;
+                        horizontal-stretch: 1;
+                        Text {
+                            text: AppState.info-title;
+                            color: Theme.text-primary;
+                            font-size: 16px;
+                            font-weight: 600;
+                            wrap: word-wrap;
+                            max-height: 44px;
+                            overflow: elide;
+                        }
+                        Text {
+                            text: AppState.info-uploader + (AppState.info-duration != "" ? "  ·  " + AppState.info-duration : "");
+                            color: Theme.text-secondary;
+                            overflow: elide;
+                        }
+                        if AppState.info-is-playlist: HorizontalLayout {
+                            spacing: 6px;
+                            alignment: start;
+                            FluentIcon {
+                                text: Icons.playlist;
+                                font-size: 12px;
+                                color: Palette.accent-background;
+                            }
+                            Text {
+                                text: @tr("Playlist · {} video", AppState.info-count);
+                                color: Palette.accent-background;
+                                font-size: 12px;
+                            }
+                        }
+                    }
+                    IconButton {
+                        glyph: Icons.cancel;
+                        label: @tr("Chiudi");
+                        clicked => { AppState.dismiss-info(); }
+                    }
+                }
+                if AppState.info-is-playlist && AppState.info-has-video: HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+                    Text {
+                        text: @tr("Questo video fa parte di una playlist:");
+                        color: Theme.text-secondary;
+                        vertical-alignment: center;
+                    }
+                    Button {
+                        text: @tr("Solo questo video");
+                        checkable: true;
+                        checked: !AppState.playlist-all;
+                        clicked => { AppState.playlist-all = false; }
+                    }
+                    Button {
+                        text: @tr("Tutta la playlist ({})", AppState.info-count);
+                        checkable: true;
+                        checked: AppState.playlist-all;
+                        clicked => { AppState.playlist-all = true; }
+                    }
+                }
+            }
+        }
+
+        // ── Opzioni ──
+        Card {
+            VerticalLayout {
+                padding: 16px;
+                spacing: 14px;
+                HorizontalLayout {
+                    spacing: 12px;
+                    VerticalLayout {
+                        spacing: 6px;
+                        width: 170px;
+                        OptionLabel { text: @tr("Tipo"); }
+                        ComboBox {
+                            model: [@tr("Video"), @tr("Solo audio")];
+                            current-index <=> AppState.kind;
+                            selected => { AppState.settings-changed(); }
+                        }
+                    }
+                    if AppState.kind == 0: VerticalLayout {
+                        spacing: 6px;
+                        width: 190px;
+                        OptionLabel { text: @tr("Qualità"); }
+                        ComboBox {
+                            model: [@tr("Migliore disponibile"), "2160p (4K)", "1440p", "1080p", "720p", "480p", "360p"];
+                            current-index <=> AppState.quality;
+                            selected => { AppState.settings-changed(); }
+                        }
+                    }
+                    if AppState.kind == 0: VerticalLayout {
+                        spacing: 6px;
+                        horizontal-stretch: 1;
+                        OptionLabel { text: @tr("Compatibilità"); }
+                        Switch {
+                            text: AppState.compat ? @tr("MP4 H.264 + AAC (ovunque)") : @tr("Massima qualità (VP9/AV1)");
+                            checked <=> AppState.compat;
+                            toggled => { AppState.settings-changed(); }
+                        }
+                    }
+                    if AppState.kind == 1: VerticalLayout {
+                        spacing: 6px;
+                        width: 190px;
+                        OptionLabel { text: @tr("Formato audio"); }
+                        ComboBox {
+                            model: ["MP3", "M4A (AAC)", "Opus", "FLAC", "WAV"];
+                            current-index <=> AppState.audio-format;
+                            selected => { AppState.settings-changed(); }
+                        }
+                    }
+                    if AppState.kind == 1: VerticalLayout {
+                        spacing: 6px;
+                        width: 190px;
+                        OptionLabel { text: @tr("Qualità audio"); }
+                        ComboBox {
+                            enabled: AppState.audio-format < 3;
+                            model: [@tr("Migliore"), "320 kbps", "256 kbps", "192 kbps", "128 kbps"];
+                            current-index <=> AppState.audio-quality;
+                            selected => { AppState.settings-changed(); }
+                        }
+                    }
+                    if AppState.kind == 1: Rectangle {
+                        horizontal-stretch: 1;
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    FluentIcon {
+                        text: Icons.folder;
+                        color: Theme.text-secondary;
+                        width: 18px;
+                    }
+                    Text {
+                        text: AppState.output-dir;
+                        color: Theme.text-secondary;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        horizontal-stretch: 1;
+                    }
+                    Button {
+                        text: @tr("Cambia…");
+                        clicked => { AppState.choose-folder(); }
+                    }
+                    Button {
+                        text: @tr("Apri");
+                        clicked => { AppState.open-folder(); }
+                    }
+                    Rectangle { width: 8px; }
+                    Button {
+                        text: @tr("Scarica");
+                        primary: true;
+                        enabled: AppState.url != "";
+                        clicked => { AppState.download(); }
+                    }
+                }
+            }
+        }
+
+        // ── Coda ──
+        HorizontalLayout {
+            spacing: 8px;
+            padding-top: 6px;
+            SectionHeader {
+                text: AppState.active-count > 0 ? @tr("Coda · {} attivi", AppState.active-count) : @tr("Coda");
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+            }
+            if AppState.finished-count > 0: Button {
+                text: @tr("Rimuovi completati");
+                clicked => { AppState.clear-finished(); }
+            }
+        }
+
+        Card {
+            vertical-stretch: 1;
+            min-height: 120px;
+            if AppState.queue.length == 0: VerticalLayout {
+                alignment: center;
+                spacing: 8px;
+                FluentIcon {
+                    text: Icons.download;
+                    font-size: 32px;
+                    color: Theme.text-tertiary;
+                }
+                Text {
+                    text: @tr("Nessun download. Incolla un link e premi Scarica.");
+                    color: Theme.text-tertiary;
+                    horizontal-alignment: center;
+                }
+            }
+            if AppState.queue.length > 0: ListView {
+                for item in AppState.queue: VerticalLayout {
+                    padding-left: 4px;
+                    padding-right: 4px;
+                    padding-top: 2px;
+                    QueueRow {
+                        item: item;
+                    }
+                }
+            }
+        }
+    }
+}

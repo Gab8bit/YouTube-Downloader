@@ -1,3 +1,4 @@
-node_modules
-resource_hacker/
-out/
+/target
+/bin
+/dist
+*.part
