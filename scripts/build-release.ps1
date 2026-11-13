@@ -16,6 +16,15 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+
+# In GitHub Actions gli errori diventano annotazioni visibili anche senza login.
+function Write-CiError([string]$Message) {
+    if ($env:GITHUB_ACTIONS) { Write-Host "::error title=build-release::$($Message -replace "`r?`n", '%0A')" }
+}
+trap {
+    Write-CiError "$($_.Exception.Message) (riga $($_.InvocationInfo.ScriptLineNumber): $($_.InvocationInfo.Line.Trim()))"
+    break
+}
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
@@ -39,6 +48,7 @@ if ($FetchTools) {
     Invoke-WebRequest 'https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip' -OutFile $ffzip
     Expand-Archive $ffzip -DestinationPath (Join-Path $dist 'ffmpeg')
     Get-ChildItem (Join-Path $dist 'ffmpeg') -Recurse -Include ffmpeg.exe, ffprobe.exe | Copy-Item -Destination $tools
+    Get-ChildItem $tools | ForEach-Object { '  {0,-12} {1,8:N1} MB' -f $_.Name, ($_.Length / 1MB) } | Write-Host
 }
 foreach ($exe in 'yt-dlp.exe', 'ffmpeg.exe', 'ffprobe.exe') {
     $src = Join-Path $tools $exe
@@ -62,8 +72,10 @@ $iscc = @(
     "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
 ) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 if (-not $iscc) { throw 'Inno Setup 6 (ISCC.exe) non trovato' }
-& $iscc /Q "/DAppVersion=$version" "/DStageDir=$stage" "/DOutputDir=$dist" (Join-Path $root 'installer\setup.iss')
-if ($LASTEXITCODE -ne 0) { throw 'compilazione installer non riuscita' }
+Write-Host "Inno Setup: $iscc"
+$isccOut = & $iscc /Q "/DAppVersion=$version" "/DStageDir=$stage" "/DOutputDir=$dist" (Join-Path $root 'installer\setup.iss') 2>&1 | ForEach-Object { "$_" }
+$isccOut | Write-Host
+if ($LASTEXITCODE -ne 0) { throw "compilazione installer non riuscita:`n$(($isccOut | Select-Object -Last 15) -join "`n")" }
 
 # ── Zip portabile ──
 $portable = Join-Path $dist "YTDownloader-$version-win64"
@@ -80,4 +92,6 @@ $lines = foreach ($f in $setup, $zip) {
 [IO.File]::WriteAllText((Join-Path $dist 'SHA256SUMS.txt'), ($lines -join "`n") + "`n")
 
 Write-Host ''
-Get-ChildItem $dist -File | ForEach-Object { '{0,-40} {1,8:N1} MB' -f $_.Name, ($_.Length / 1MB) }
+Get-ChildItem $dist -File | ForEach-Object { '{0,-40} {1,8:N1} MB' -f $_.Name, ($_.Length / 1MB) } | Write-Host
+# Evita che un exit code residuo di un comando nativo faccia fallire lo step.
+exit 0
