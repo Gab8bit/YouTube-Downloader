@@ -13,6 +13,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::proc::ProcessGroup;
 use crate::settings::Settings;
 use crate::tools;
+use crate::updater::{self, Release};
 use crate::util::{human_bytes, human_duration, human_speed};
 use crate::ytdlp::{self, DownloadOptions, MediaInfo, OutputLine, StreamLine};
 use crate::{AppState, AppWindow, JobState, LogLine, QueueItem};
@@ -29,6 +30,20 @@ pub enum Event {
     ToolsReady { result: Result<(), String> },
     Versions { ytdlp: Option<String>, ffmpeg: Option<String> },
     ToolsUpdated { result: Result<Vec<String>, String> },
+    UpdateChecked { result: Result<Option<Release>, String>, manual: bool },
+    UpdateProgress(f32),
+    UpdateDownloaded(Result<PathBuf, String>),
+}
+
+/// Valori di `AppState.update-status`.
+mod upd {
+    pub const IDLE: i32 = 0;
+    pub const CHECKING: i32 = 1;
+    pub const AVAILABLE: i32 = 2;
+    pub const DOWNLOADING: i32 = 3;
+    pub const READY: i32 = 4;
+    pub const UP_TO_DATE: i32 = 5;
+    pub const ERROR: i32 = 6;
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -69,6 +84,9 @@ pub struct App {
     info_thumb: Option<Image>,
     tools_ready: bool,
     tools_busy: bool,
+    update_status: i32,
+    update_release: Option<Release>,
+    update_file: Option<PathBuf>,
 }
 
 thread_local! {
@@ -131,6 +149,9 @@ pub fn init(ui: &AppWindow, settings: Settings) {
         info_thumb: None,
         tools_ready: false,
         tools_busy: true,
+        update_status: upd::IDLE,
+        update_release: None,
+        update_file: None,
     };
     app.apply_settings_to_ui();
     app.ui(|ui| ui.global::<AppState>().set_tools_busy(true));
@@ -149,6 +170,13 @@ pub fn init(ui: &AppWindow, settings: Settings) {
             post(Event::ToolsUpdated { result: Ok(Vec::new()) });
         }
     });
+
+    // Controllo aggiornamenti dell'app qualche secondo dopo l'avvio.
+    std::thread::spawn(|| {
+        std::thread::sleep(std::time::Duration::from_secs(3));
+        post(Event::UpdateChecked { result: updater::check(), manual: false });
+    });
+    with_app(|a| a.set_update_status(upd::CHECKING));
 }
 
 fn now_secs() -> u64 {
@@ -191,6 +219,7 @@ impl App {
             st.set_audio_quality(s.audio_quality);
             st.set_filename_template(s.filename_template.as_str().into());
             st.set_max_parallel(s.max_parallel);
+            st.set_auto_update(s.auto_update);
         });
     }
 
@@ -204,6 +233,7 @@ impl App {
         s.audio_format = st.get_audio_format();
         s.audio_quality = st.get_audio_quality();
         s.max_parallel = st.get_max_parallel().clamp(1, 6);
+        s.auto_update = st.get_auto_update();
         let template = st.get_filename_template().trim().to_string();
         if !template.is_empty() {
             s.filename_template = template;
@@ -637,6 +667,118 @@ impl App {
                     }
                     Err(e) => self.log(format!("Aggiornamento yt-dlp non riuscito: {e}"), 1),
                 }
+            }
+            Event::UpdateChecked { result, manual } => self.on_update_checked(result, manual),
+            Event::UpdateProgress(p) => {
+                if self.update_status == upd::DOWNLOADING {
+                    self.ui(|ui| ui.global::<AppState>().set_update_progress(p));
+                }
+            }
+            Event::UpdateDownloaded(result) => match result {
+                Ok(path) => {
+                    self.log(format!("Aggiornamento pronto: {}", path.display()), 2);
+                    self.update_file = Some(path);
+                    self.set_update_status(upd::READY);
+                }
+                Err(e) => {
+                    self.log(format!("Download dell'aggiornamento non riuscito: {e}"), 1);
+                    self.ui(|ui| ui.global::<AppState>().set_update_error(e.as_str().into()));
+                    self.set_update_status(upd::ERROR);
+                }
+            },
+        }
+    }
+
+    // ───────────── Aggiornamenti dell'app ─────────────
+
+    fn set_update_status(&mut self, status: i32) {
+        self.update_status = status;
+        self.ui(|ui| ui.global::<AppState>().set_update_status(status));
+    }
+
+    pub fn check_updates(&mut self) {
+        if matches!(self.update_status, upd::CHECKING | upd::DOWNLOADING | upd::READY) {
+            return;
+        }
+        self.set_update_status(upd::CHECKING);
+        std::thread::spawn(|| post(Event::UpdateChecked { result: updater::check(), manual: true }));
+    }
+
+    fn on_update_checked(&mut self, result: Result<Option<Release>, String>, manual: bool) {
+        if matches!(self.update_status, upd::DOWNLOADING | upd::READY) {
+            return;
+        }
+        match result {
+            Ok(Some(rel)) => {
+                self.log(format!("Disponibile YT Downloader {}", rel.version), 0);
+                self.ui(|ui| ui.global::<AppState>().set_update_version(rel.version.as_str().into()));
+                self.update_release = Some(rel);
+                self.set_update_status(upd::AVAILABLE);
+                if self.settings.auto_update {
+                    self.start_update();
+                }
+            }
+            Ok(None) => self.set_update_status(if manual { upd::UP_TO_DATE } else { upd::IDLE }),
+            Err(e) => {
+                self.log(format!("Controllo aggiornamenti non riuscito: {e}"), if manual { 1 } else { 0 });
+                if manual {
+                    self.ui(|ui| ui.global::<AppState>().set_update_error(e.as_str().into()));
+                    self.set_update_status(upd::ERROR);
+                } else {
+                    self.set_update_status(upd::IDLE);
+                }
+            }
+        }
+    }
+
+    pub fn start_update(&mut self) {
+        let Some(rel) = self.update_release.clone() else { return };
+        if self.update_status == upd::DOWNLOADING {
+            return;
+        }
+        self.set_update_status(upd::DOWNLOADING);
+        self.ui(|ui| ui.global::<AppState>().set_update_progress(0.0));
+        self.log(format!("Download di YT Downloader {}…", rel.version), 0);
+        std::thread::spawn(move || {
+            let last = std::sync::atomic::AtomicU32::new(0);
+            let result = updater::download(&rel, |p| {
+                // Notifica solo a ogni punto percentuale.
+                let pct = (p * 100.0) as u32;
+                if last.swap(pct, std::sync::atomic::Ordering::Relaxed) != pct {
+                    post(Event::UpdateProgress(p));
+                }
+            });
+            post(Event::UpdateDownloaded(result));
+        });
+    }
+
+    pub fn open_release_page(&self) {
+        let url = self
+            .update_release
+            .as_ref()
+            .map(|r| r.page_url.clone())
+            .unwrap_or_else(|| format!("https://github.com/{}/releases", updater::REPO));
+        crate::util::open_url(&url);
+    }
+
+    /// Avvia il setup e riapre l'app al termine. Restituisce `true` se l'app deve chiudersi.
+    pub fn install_update_now(&mut self) -> bool {
+        let Some(file) = self.update_file.clone().filter(|f| f.is_file()) else { return false };
+        match updater::launch_installer(&file, true) {
+            Ok(()) => true,
+            Err(e) => {
+                self.log(format!("Impossibile avviare il setup: {e}"), 1);
+                self.show_error(&format!("Impossibile avviare l'aggiornamento: {e}"));
+                false
+            }
+        }
+    }
+
+    /// Alla chiusura: se un aggiornamento è pronto lo installa in silenzio.
+    pub fn install_update_on_exit(&mut self) {
+        if self.update_status == upd::READY {
+            if let Some(file) = self.update_file.clone().filter(|f| f.is_file()) {
+                let _ = updater::launch_installer(&file, false);
             }
         }
     }

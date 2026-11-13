@@ -28,6 +28,23 @@ cargo test -- --ignored   # test che usano la rete (lettura info da YouTube)
 cargo build --release     # target/release/YTDownloader.exe
 ```
 
+## Installer e release
+
+`scripts/build-release.ps1` compila l'app e crea in `dist/`:
+
+- `YTDownloader-Setup-x.y.z.exe` — installer per utente (Inno Setup, nessun permesso admin)
+- `YTDownloader-x.y.z-win64.zip` — versione portabile
+- `SHA256SUMS.txt` — checksum usati dall'aggiornamento automatico
+
+Per pubblicare una nuova versione:
+
+1. aggiorna `version` in `Cargo.toml` e fai il commit
+2. crea e pubblica il tag: `git tag v4.0.1` → `git push origin v4.0.1`
+3. GitHub Actions (`.github/workflows/release.yml`) compila tutto e crea la release
+
+L'app controlla le GitHub Releases all'avvio, scarica il nuovo setup, ne verifica lo SHA-256
+e lo installa in silenzio alla chiusura (o subito con «Riavvia e aggiorna»).
+
 ## Struttura
 
 ```
@@ -36,4 +53,7 @@ src/app.rs     stato dell'app e coda dei download
 src/ytdlp.rs   argomenti, lettura info e parsing del progresso di yt-dlp
 src/tools.rs   preparazione/aggiornamento di yt-dlp e ffmpeg, HTTP
 src/proc.rs    Job Object di Windows (annulla = termina yt-dlp + ffmpeg)
+src/updater.rs aggiornamento automatico dalle GitHub Releases
+installer/     script Inno Setup
+scripts/       build locale di setup e zip
 ```

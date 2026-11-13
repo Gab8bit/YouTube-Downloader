@@ -21,6 +21,7 @@ dirs = "6"
 ureq = { version = "3", features = ["json"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 rfd = "0.18"
+sha2 = "0.10"
 arboard = { version = "3", default-features = false }
 
 [target.'cfg(windows)'.dependencies]

@@ -6,6 +6,7 @@ mod paths;
 mod proc;
 mod settings;
 mod tools;
+mod updater;
 mod util;
 mod ytdlp;
 
@@ -112,24 +113,50 @@ fn main() -> Result<(), slint::PlatformError> {
     });
     st.on_open_url(|url| util::open_url(&url));
 
-    // Chiedi conferma se si chiude con download in corso.
+    st.on_check_updates(|| {
+        with_app(|a| a.check_updates());
+    });
+    st.on_start_update(|| {
+        with_app(|a| a.start_update());
+    });
+    st.on_open_release_page(|| {
+        with_app(|a| a.open_release_page());
+    });
+    let weak = ui.as_weak();
+    st.on_install_update(move || {
+        if !confirm_stop_downloads(&weak) {
+            return;
+        }
+        if with_app(|a| a.install_update_now()).unwrap_or(false) {
+            let _ = slint::quit_event_loop();
+        }
+    });
+
+    // Conferma se si chiude con download in corso; installa l'eventuale aggiornamento pronto.
     let weak = ui.as_weak();
     ui.window().on_close_requested(move || {
-        if with_app(|a| a.has_running_jobs()).unwrap_or(false) {
-            let mut dialog = rfd::MessageDialog::new()
-                .set_title("YT Downloader")
-                .set_description("Ci sono download in corso. Chiudendo verranno interrotti.\n\nChiudere comunque?")
-                .set_level(rfd::MessageLevel::Warning)
-                .set_buttons(rfd::MessageButtons::YesNo);
-            if let Some(ui) = weak.upgrade() {
-                dialog = dialog.set_parent(&ui.window().window_handle());
-            }
-            if dialog.show() != rfd::MessageDialogResult::Yes {
-                return slint::CloseRequestResponse::KeepWindowShown;
-            }
+        if !confirm_stop_downloads(&weak) {
+            return slint::CloseRequestResponse::KeepWindowShown;
         }
+        with_app(|a| a.install_update_on_exit());
         slint::CloseRequestResponse::HideWindow
     });
 
     ui.run()
+}
+
+/// Se ci sono download attivi chiede se interromperli. `true` = si può procedere.
+fn confirm_stop_downloads(weak: &slint::Weak<AppWindow>) -> bool {
+    if !with_app(|a| a.has_running_jobs()).unwrap_or(false) {
+        return true;
+    }
+    let mut dialog = rfd::MessageDialog::new()
+        .set_title("YT Downloader")
+        .set_description("Ci sono download in corso e verranno interrotti.\n\nContinuare?")
+        .set_level(rfd::MessageLevel::Warning)
+        .set_buttons(rfd::MessageButtons::YesNo);
+    if let Some(ui) = weak.upgrade() {
+        dialog = dialog.set_parent(&ui.window().window_handle());
+    }
+    dialog.show() == rfd::MessageDialogResult::Yes
 }

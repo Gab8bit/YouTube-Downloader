@@ -20,6 +20,8 @@ pub struct Settings {
     pub max_parallel: i32,
     /// Ultimo controllo aggiornamenti di yt-dlp (secondi Unix).
     pub ytdlp_last_update: u64,
+    /// Scarica in automatico gli aggiornamenti dell'app.
+    pub auto_update: bool,
 }
 
 impl Default for Settings {
@@ -34,6 +36,7 @@ impl Default for Settings {
             filename_template: DEFAULT_TEMPLATE.into(),
             max_parallel: 2,
             ytdlp_last_update: 0,
+            auto_update: true,
         }
     }
 }

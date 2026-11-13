@@ -20,9 +20,7 @@ pub fn human_bytes(bytes: f64) -> String {
         value /= 1024.0;
         unit += 1;
     }
-    if unit == 0 {
-        format!("{value:.0} {}", UNITS[unit])
-    } else if value >= 100.0 {
+    if unit == 0 || value >= 100.0 {
         format!("{value:.0} {}", UNITS[unit])
     } else {
         format!("{value:.1} {}", UNITS[unit])

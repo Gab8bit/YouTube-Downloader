@@ -1,4 +1,4 @@
-import { Button, LineEdit, SpinBox, ListView, ScrollView, Palette } from "std-widgets.slint";
+import { Button, LineEdit, SpinBox, ListView, ScrollView, Switch, Palette } from "std-widgets.slint";
 import { Theme, Icons } from "theme.slint";
 import { Card, FluentIcon, SectionHeader, SettingRow } from "components.slint";
 import { AppState } from "state.slint";
@@ -126,6 +126,50 @@ export component SettingsPage inherits Rectangle {
                 glyph: Icons.video;
                 title: "FFmpeg";
                 description: AppState.ffmpeg-version;
+            }
+
+            Rectangle { height: 14px; }
+            SectionHeader { text: @tr("Aggiornamenti"); }
+            SettingRow {
+                glyph: Icons.retry;
+                title: @tr("Aggiornamenti dell'app");
+                description: AppState.update-status == 1 ? @tr("Controllo in corso…")
+                    : AppState.update-status == 2 ? @tr("Disponibile la versione {}", AppState.update-version)
+                    : AppState.update-status == 3 ? @tr("Download della versione {}… {}%", AppState.update-version, Math.round(AppState.update-progress * 100))
+                    : AppState.update-status == 4 ? @tr("Versione {} pronta da installare", AppState.update-version)
+                    : AppState.update-status == 5 ? @tr("Stai usando la versione più recente")
+                    : AppState.update-status == 6 ? @tr("Controllo non riuscito: {}", AppState.update-error)
+                    : @tr("Versione attuale {}", AppState.app-version);
+                VerticalLayout {
+                    alignment: center;
+                    if AppState.update-status == 4: Button {
+                        text: @tr("Riavvia e aggiorna");
+                        primary: true;
+                        clicked => { AppState.install-update(); }
+                    }
+                    if AppState.update-status == 2: Button {
+                        text: @tr("Aggiorna");
+                        primary: true;
+                        clicked => { AppState.start-update(); }
+                    }
+                    if AppState.update-status != 2 && AppState.update-status != 4: Button {
+                        text: @tr("Controlla");
+                        enabled: AppState.update-status != 1 && AppState.update-status != 3;
+                        clicked => { AppState.check-updates(); }
+                    }
+                }
+            }
+            SettingRow {
+                glyph: Icons.download;
+                title: @tr("Scarica gli aggiornamenti automaticamente");
+                description: @tr("Vengono installati alla chiusura dell'app o con «Riavvia e aggiorna»");
+                VerticalLayout {
+                    alignment: center;
+                    Switch {
+                        checked <=> AppState.auto-update;
+                        toggled => { AppState.settings-changed(); }
+                    }
+                }
             }
 
             Rectangle { height: 14px; }

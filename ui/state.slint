@@ -67,6 +67,18 @@ export global AppState {
     in property <bool> tools-busy;
     in property <bool> tools-ready;
 
+    // ── Aggiornamenti app ──
+    // 0 = nessuno, 1 = controllo, 2 = disponibile, 3 = download, 4 = pronto, 5 = aggiornato, 6 = errore
+    in property <int> update-status;
+    in property <string> update-version;
+    in property <float> update-progress;
+    in property <string> update-error;
+    in-out property <bool> auto-update: true;
+    callback check-updates();
+    callback start-update();
+    callback install-update();
+    callback open-release-page();
+
     callback fetch(string);
     callback paste();
     callback dismiss-info();
