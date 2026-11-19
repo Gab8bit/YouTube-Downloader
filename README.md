@@ -1,4 +1,15 @@
-# YT Downloader
+# YT Downloader — v3 (Electron)
+
+> [!WARNING]
+> **Versione non più manutenuta.** La v3 in Electron funziona ancora ma non riceve aggiornamenti né correzioni.
+> La versione attuale è la **v4 nativa in Rust**: codice nel branch [`main`](https://github.com/Gab8bit/YouTube-Downloader/tree/main),
+> download dall'[ultima release](https://github.com/Gab8bit/YouTube-Downloader/releases/latest).
+>
+> | Versione | Tecnologia | Stato | Branch |
+> |---|---|---|---|
+> | v4 | Rust + Slint | ✅ attuale | [`main`](https://github.com/Gab8bit/YouTube-Downloader/tree/main) |
+> | v3 | Electron | ⚠️ non più manutenuta | `legacy/electron` (questo) |
+> | v1–v2 | C++ / Java | ❌ deprecata | [`legacy/java`](https://github.com/Gab8bit/YouTube-Downloader/tree/legacy/java) |
 
 ## Struttura
 ```
