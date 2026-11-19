@@ -51,9 +51,11 @@ SetupIconFile=..\assets\icon.ico
 UninstallDisplayIcon={app}\{#AppExe}
 UninstallDisplayName={#AppName}
 WizardStyle=modern
-Compression=lzma2/ultra64
+; ISCC è a 32 bit: la compressione gira in un processo separato (a 64 bit) per non
+; esaurire la memoria con gli eseguibili di ffmpeg (~200 MB l'uno).
+Compression=lzma2/max
 SolidCompression=yes
-LZMANumBlockThreads=4
+LZMAUseSeparateProcess=yes
 
 CloseApplications=yes
 RestartApplications=no
