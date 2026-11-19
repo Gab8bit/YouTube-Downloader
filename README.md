@@ -2,7 +2,20 @@
 
 GUI nativa per Windows 11 di [yt-dlp](https://github.com/yt-dlp/yt-dlp), scritta in Rust + [Slint](https://slint.dev) con stile Fluent.
 
-> La v4 sostituisce la vecchia versione Electron (v3.x): un unico `.exe` leggero, avvio istantaneo, tema chiaro/scuro e colore d'accento di sistema.
+**[⬇ Scarica l'ultima versione](https://github.com/Gab8bit/YouTube-Downloader/releases/latest)** — `YTDownloader-Setup-x.y.z.exe` (installazione senza permessi di amministratore, si aggiorna da sola).
+
+## Versioni
+
+Il progetto ha avuto tre generazioni. Questo branch (`main`) contiene solo quella attuale.
+
+| Versione | Tecnologia | Stato | Codice | Ultima release |
+|---|---|---|---|---|
+| **v4** | Rust + Slint | ✅ **attuale**, manutenuta | `main` | [latest](https://github.com/Gab8bit/YouTube-Downloader/releases/latest) |
+| v3 | Electron | ⚠️ funziona ancora, **non più manutenuta** | [`legacy/electron`](https://github.com/Gab8bit/YouTube-Downloader/tree/legacy/electron) | [Electron-v3.0.1](https://github.com/Gab8bit/YouTube-Downloader/releases/tag/Electron-v3.0.1) |
+| v1–v2 | C++ / Java | ❌ **deprecata** | [`legacy/java`](https://github.com/Gab8bit/YouTube-Downloader/tree/legacy/java) | [Windows-v2.0](https://github.com/Gab8bit/YouTube-Downloader/releases/tag/Windows-v2.0) |
+
+La v4 sostituisce la v3 Electron: un unico `.exe` leggero, avvio istantaneo, tema chiaro/scuro e colore d'accento di sistema.
+Se la v3 è installata, l'installer della v4 propone di rimuoverla.
 
 ## Funzionalità
 
